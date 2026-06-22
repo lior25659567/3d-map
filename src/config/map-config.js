@@ -17,7 +17,7 @@ export const CITY = PLACES[0]
 //   radiusKm: half-width of the allowed box around a place's center.
 //   minZoom: can't zoom out far enough to pull in a huge region.
 export const VIEW_LIMITS = {
-  radiusKm: 5,
+  radiusKm: 3,
   minZoom: 14,
   maxZoom: 18.5,
 }

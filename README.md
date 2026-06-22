@@ -1,66 +1,174 @@
-# 3D Map — Photoreal
+# Photoreal 3D City Map
 
-Interactive photorealistic 3D city map (Google Earth-style) built on Google
-Photorealistic 3D Tiles, rendered with deck.gl over a MapLibre base. Pick a city,
-orbit/zoom the 3D skyline, click a building to zoom toward it.
+An interactive **photorealistic 3D city map** (Google Earth-style) for the web.
+It streams **Google Photorealistic 3D Tiles** and renders them with **deck.gl**
+on top of a **MapLibre** base map. Pick a city, orbit and zoom the real 3D
+skyline, and click a building to zoom toward it.
 
-## Run
+Built with **React + Vite**. No backend required — it runs entirely in the
+browser and talks directly to Google's tile API with your key.
+
+---
+
+## Table of contents
+
+1. [What you need](#1-what-you-need)
+2. [Get a Google Maps API key](#2-get-a-google-maps-api-key)
+3. [Create your `.env` file](#3-create-your-env-file)
+4. [Run it](#4-run-it)
+5. [Configure (cities, area, quality)](#5-configure)
+6. [Integrate into your own product](#6-integrate-into-your-own-product)
+7. [Cost & security notes](#7-cost--security-notes)
+8. [Troubleshooting](#8-troubleshooting)
+
+---
+
+## 1. What you need
+
+- **Node.js 18+** and npm.
+- A **Google Cloud account with billing enabled** (the photoreal tiles are a paid
+  Google API — there's a small monthly free tier, then it's billed).
+
+> There is no free or self-hostable source of photorealistic 3D buildings.
+> Google streams that data live; the key is mandatory for the 3D map.
+
+---
+
+## 2. Get a Google Maps API key
+
+1. Open the [Google Cloud Console](https://console.cloud.google.com/).
+2. Create a project (top bar → project dropdown → **New Project**), or pick one.
+3. **Enable billing:** Billing → link a billing account to the project.
+   *(Required even to use the free tier.)*
+4. Enable the APIs: **APIs & Services → Library**, then enable:
+   - **Map Tiles API** — required (the 3D tiles).
+   - **Maps JavaScript API** — only if you want the **Street level** button
+     (Google Street View).
+5. Create the key: **APIs & Services → Credentials → Create credentials → API key**.
+6. **Restrict the key** (recommended):
+   - *API restrictions* → limit to the two APIs above.
+   - *Application restrictions* → **HTTP referrers**, add the sites that may use it,
+     e.g. `http://localhost:5173/*` for local dev and `https://yourdomain.com/*`
+     for production.
+
+Copy the key string (looks like `AIza...`).
+
+---
+
+## 3. Create your `.env` file
+
+In the project root, copy the example and paste your key:
+
+```bash
+cp .env.example .env
+```
+
+Then edit `.env`:
+
+```ini
+# Required: Google Maps Platform key (billing enabled)
+VITE_GOOGLE_MAPS_KEY=AIza_your_key_here
+
+# Optional: free Mapillary street imagery, used ONLY if no Google key is set.
+VITE_MAPILLARY_TOKEN=
+```
+
+Notes:
+- The `VITE_` prefix is required — Vite only exposes those vars to the browser.
+- `.env` is **gitignored**; never commit your key.
+- Because this is a client-side app, the key is visible in the browser. That's
+  expected for Google Maps web keys — protect it with the **HTTP referrer
+  restrictions** from step 2.6, not by hiding it.
+
+---
+
+## 4. Run it
 
 ```bash
 npm install
-cp .env.example .env     # then add your Google Maps key (see below)
-npm run dev              # http://localhost:5173
+npm run dev        # dev server at http://localhost:5173
+npm run build      # production build into dist/
+npm run preview    # serve the production build locally
 ```
 
-The map needs a Google Maps key — without one it shows a notice instead of the map.
+Open http://localhost:5173. Without a key you'll see a notice instead of the map.
 
-## Google Maps key (required)
+---
 
-Photorealistic 3D Tiles are Google's proprietary streamed data; there is no free
-or self-hosted equivalent.
+## 5. Configure
 
-1. [Google Cloud Console](https://console.cloud.google.com/) → create/pick a project.
-2. **Enable billing** (required even for the free tier).
-3. APIs & Services → enable **Map Tiles API** (and **Maps JavaScript API** if you
-   want Google Street View from the "Street level" button).
-4. Credentials → **Create API key**. Restrict it to those APIs and to your domain.
-5. Put it in `.env` (gitignored — never commit it):
+Everything is in **[`src/config/map-config.js`](src/config/map-config.js)**:
+
+| Setting | What it controls |
+|---|---|
+| `PLACES` | Cities in the picker. Add one: `{ id, name, center: [lng, lat], zoom, pitch, bearing }`. |
+| `VIEW_LIMITS.radiusKm` | Half-size of the camera box around a city. **Smaller (e.g. 3) = the area caches fully → buttery-smooth, no rebuilding.** Larger = roam wider but more streaming. |
+| `VIEW_LIMITS.minZoom` / `maxZoom` | Zoom range. A higher `minZoom` keeps the view local (fewer tiles). |
+| `PHOTOREAL.screenSpaceError` | Detail vs speed. **Higher = faster, coarser; lower = sharper, slower.** |
+| `PHOTOREAL.maxMemoryMB` | Tile cache size. Bigger = visited areas stay loaded (no re-download). |
+| `CLICK_ZOOM` | How far a building click zooms in. |
+
+To change the default city, reorder `PLACES` (the first entry is the default).
+
+---
+
+## 6. Integrate into your own product
+
+The map is a self-contained React tree. To drop it into an existing app:
+
+1. **Install the same deps** (see `package.json`):
+   `maplibre-gl`, `@deck.gl/core`, `@deck.gl/mapbox`, `@deck.gl/geo-layers`,
+   `mapillary-js`.
+2. **Copy `src/components/`, `src/config/`, and `src/providers/`** into your app.
+3. **Render the map** wherever you want it (it fills its container):
+
+   ```jsx
+   import MapView from './components/MapView/MapView.jsx'
+   import Photoreal3DLayer from './components/Photoreal3DLayer/Photoreal3DLayer.jsx'
+   import MapControls from './components/MapControls/MapControls.jsx'
+   import PlacePicker from './components/PlacePicker/PlacePicker.jsx'
+
+   function Map3D() {
+     return (
+       <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+         <MapView>
+           <Photoreal3DLayer />
+           <PlacePicker activeId="miami" onChange={() => {}} />
+           <MapControls onEnterStreetLevel={() => {}} />
+         </MapView>
+       </div>
+     )
+   }
    ```
-   VITE_GOOGLE_MAPS_KEY=your_key_here
-   ```
-6. `npm run dev`.
 
-> ⚠️ Photorealistic 3D Tiles is an Enterprise SKU with only ~1,000 free tile
-> loads/month — effectively paid for real traffic. Watch usage in the Cloud
-> Console and set a budget alert before going public.
+4. **Provide the key** via your build's env (`VITE_GOOGLE_MAPS_KEY`), or change
+   `KEYS` in `map-config.js` to read from wherever your app keeps config.
 
-### Optional: Mapillary (free street-level fallback)
+Architecture, in one breath: `MapView` boots one MapLibre map and shares it via
+React context; `Photoreal3DLayer` attaches a deck.gl `Tile3DLayer` of Google's
+tiles as an interleaved overlay; `PlacePicker`/`MapControls` drive that shared
+map. Each piece is independent — take only what you need.
 
-Only used if you have **no** Google key. Create an app at the
-[Mapillary dashboard](https://www.mapillary.com/dashboard/developers) and set
-`VITE_MAPILLARY_TOKEN` in `.env`. With a Google key, Street level uses Google
-Street View instead.
+---
 
-## Configuration
+## 7. Cost & security notes
 
-Everything lives in [`src/config/map-config.js`](src/config/map-config.js):
+- **Photorealistic 3D Tiles** is an Enterprise SKU: ~**1,000 free tile loads/month**,
+  then billed. Fine for dev; budget for real traffic.
+- Set a **budget alert** in Google Cloud Billing.
+- **Restrict your key** by API + HTTP referrer (step 2.6) so others can't reuse it.
+- The bounded view (`VIEW_LIMITS`) also limits how many tiles a session can pull,
+  which helps keep usage predictable.
 
-- **`PLACES`** — cities in the picker. Add one with `{ id, name, center: [lng, lat], zoom, pitch, bearing }`.
-- **`VIEW_LIMITS`** — bounds the camera to one city so the 3D tiles stay a finite,
-  cached set (smooth movement, no rebuilding). Smaller `radiusKm` = tighter area
-  that caches fully; `minZoom`/`maxZoom` cap the zoom range.
-- **`PHOTOREAL`** — load tuning. `screenSpaceError` (higher = faster/coarser,
-  lower = sharper/more detail) and `maxMemoryMB` (tile cache size).
-- **`CLICK_ZOOM`** — how far a building click zooms in.
+---
 
-## How it works
+## 8. Troubleshooting
 
-- [`MapView`](src/components/MapView/MapView.jsx) — MapLibre base map (empty dark
-  style; the 3D mesh covers the ground) with bounds + zoom limits applied.
-- [`Photoreal3DLayer`](src/components/Photoreal3DLayer/Photoreal3DLayer.jsx) —
-  deck.gl `Tile3DLayer` of Google's 3D Tiles via an interleaved `MapboxOverlay`;
-  sets cache size + detail level and handles click-to-zoom.
-- [`PlacePicker`](src/components/PlacePicker/PlacePicker.jsx) — jumps between
-  cities and re-bounds the camera.
-- [`StreetView`](src/components/StreetView/StreetView.jsx) — Google Street View
-  (or Mapillary fallback) opened from the "Street level" button.
+- **"Add a Google Maps key" notice / blank map** — `VITE_GOOGLE_MAPS_KEY` missing
+  or the dev server wasn't restarted after editing `.env`.
+- **403 / tiles don't load** — Map Tiles API not enabled, billing not active, or
+  the key's referrer restriction doesn't include your URL.
+- **Street View button missing** — needs a Google key (or a `VITE_MAPILLARY_TOKEN`
+  for the free fallback).
+- **Stutters / rebuilding while moving** — lower `VIEW_LIMITS.radiusKm`, raise
+  `PHOTOREAL.maxMemoryMB`, or raise `PHOTOREAL.screenSpaceError`.
