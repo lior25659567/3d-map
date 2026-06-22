@@ -5,8 +5,10 @@ It streams **Google Photorealistic 3D Tiles** and renders them with **deck.gl**
 on top of a **MapLibre** base map. Pick a city, orbit and zoom the real 3D
 skyline, and click a building to zoom toward it.
 
-Built with **React + Vite**. No backend required — it runs entirely in the
-browser and talks directly to Google's tile API with your key.
+The UI is intentionally minimal: just the **3D map** and a **city picker**.
+
+Built with **React + Vite**. No backend — it runs entirely in the browser and
+talks directly to Google's tile API with your key.
 
 ---
 
@@ -40,13 +42,10 @@ browser and talks directly to Google's tile API with your key.
 2. Create a project (top bar → project dropdown → **New Project**), or pick one.
 3. **Enable billing:** Billing → link a billing account to the project.
    *(Required even to use the free tier.)*
-4. Enable the APIs: **APIs & Services → Library**, then enable:
-   - **Map Tiles API** — required (the 3D tiles).
-   - **Maps JavaScript API** — only if you want the **Street level** button
-     (Google Street View).
+4. Enable the API: **APIs & Services → Library** → enable **Map Tiles API**.
 5. Create the key: **APIs & Services → Credentials → Create credentials → API key**.
 6. **Restrict the key** (recommended):
-   - *API restrictions* → limit to the two APIs above.
+   - *API restrictions* → limit to **Map Tiles API**.
    - *Application restrictions* → **HTTP referrers**, add the sites that may use it,
      e.g. `http://localhost:5173/*` for local dev and `https://yourdomain.com/*`
      for production.
@@ -68,9 +67,6 @@ Then edit `.env`:
 ```ini
 # Required: Google Maps Platform key (billing enabled)
 VITE_GOOGLE_MAPS_KEY=AIza_your_key_here
-
-# Optional: free Mapillary street imagery, used ONLY if no Google key is set.
-VITE_MAPILLARY_TOKEN=
 ```
 
 Notes:
@@ -116,16 +112,14 @@ To change the default city, reorder `PLACES` (the first entry is the default).
 
 The map is a self-contained React tree. To drop it into an existing app:
 
-1. **Install the same deps** (see `package.json`):
-   `maplibre-gl`, `@deck.gl/core`, `@deck.gl/mapbox`, `@deck.gl/geo-layers`,
-   `mapillary-js`.
+1. **Install the deps** (see `package.json`):
+   `maplibre-gl`, `@deck.gl/core`, `@deck.gl/mapbox`, `@deck.gl/geo-layers`.
 2. **Copy `src/components/`, `src/config/`, and `src/providers/`** into your app.
 3. **Render the map** wherever you want it (it fills its container):
 
    ```jsx
    import MapView from './components/MapView/MapView.jsx'
    import Photoreal3DLayer from './components/Photoreal3DLayer/Photoreal3DLayer.jsx'
-   import MapControls from './components/MapControls/MapControls.jsx'
    import PlacePicker from './components/PlacePicker/PlacePicker.jsx'
 
    function Map3D() {
@@ -134,7 +128,6 @@ The map is a self-contained React tree. To drop it into an existing app:
          <MapView>
            <Photoreal3DLayer />
            <PlacePicker activeId="miami" onChange={() => {}} />
-           <MapControls onEnterStreetLevel={() => {}} />
          </MapView>
        </div>
      )
@@ -146,8 +139,8 @@ The map is a self-contained React tree. To drop it into an existing app:
 
 Architecture, in one breath: `MapView` boots one MapLibre map and shares it via
 React context; `Photoreal3DLayer` attaches a deck.gl `Tile3DLayer` of Google's
-tiles as an interleaved overlay; `PlacePicker`/`MapControls` drive that shared
-map. Each piece is independent — take only what you need.
+tiles as an interleaved overlay; `PlacePicker` drives that shared map. Each piece
+is independent — take only what you need.
 
 ---
 
@@ -157,6 +150,7 @@ map. Each piece is independent — take only what you need.
   then billed. Fine for dev; budget for real traffic.
 - Set a **budget alert** in Google Cloud Billing.
 - **Restrict your key** by API + HTTP referrer (step 2.6) so others can't reuse it.
+- Google's terms require keeping the **on-screen attribution** (bottom-left) visible.
 - The bounded view (`VIEW_LIMITS`) also limits how many tiles a session can pull,
   which helps keep usage predictable.
 
@@ -168,7 +162,5 @@ map. Each piece is independent — take only what you need.
   or the dev server wasn't restarted after editing `.env`.
 - **403 / tiles don't load** — Map Tiles API not enabled, billing not active, or
   the key's referrer restriction doesn't include your URL.
-- **Street View button missing** — needs a Google key (or a `VITE_MAPILLARY_TOKEN`
-  for the free fallback).
 - **Stutters / rebuilding while moving** — lower `VIEW_LIMITS.radiusKm`, raise
   `PHOTOREAL.maxMemoryMB`, or raise `PHOTOREAL.screenSpaceError`.

@@ -66,8 +66,7 @@ export const CLICK_ZOOM = {
   maxZoom: 17.5,
 }
 
-// Keys are optional. Empty string when not provided.
+// Google Maps key (required for the photoreal tiles). Empty when not provided.
 export const KEYS = {
   google: import.meta.env.VITE_GOOGLE_MAPS_KEY ?? '',
-  mapillary: import.meta.env.VITE_MAPILLARY_TOKEN ?? '',
 }
